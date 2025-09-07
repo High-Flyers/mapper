@@ -116,30 +116,32 @@ class Capturer:
         if not self.cap.isOpened():
             print("Error: Unable to open camera")
             exit()
-        while True:
-            ret, frame = self.cap.read()
-            if ret:
-                if self.preview:
-                    cv2.imshow("Frame", frame)
-                if self.writer:
-                    if self.last_drone_data:
-                        self.telems.append(self.last_drone_data)
-                        self.writer.write(frame)
-                        frames_num += 1
-                    else:
-                        print("Warning: No telem, skipping frame.")
-            else:
-                print("Error: Could not read frame")
-                break
+        try:
+            while True:
+                ret, frame = self.cap.read()
+                if ret:
+                    if self.preview:
+                        cv2.imshow("Frame", frame)
+                    if self.writer:
+                        if self.last_drone_data:
+                            self.telems.append(self.last_drone_data)
+                            self.writer.write(frame)
+                            frames_num += 1
+                        else:
+                            print("Warning: No telem, skipping frame.")
+                else:
+                    print("Error: Could not read frame")
+                    break
 
-            if self.preview and cv2.waitKey(1) == ord("q"):
-                break
-
-        self.cap.release()
-        if self.writer:
-            self.writer.release()
-
-        print(f"Total frames written: {frames_num}")
+                if self.preview and cv2.waitKey(1) == ord("q"):
+                    break
+        except KeyboardInterrupt:
+            print("\nKeyboardInterrupt received in video loop. Exiting...")
+        finally:
+            self.cap.release()
+            if self.writer:
+                self.writer.release()
+            print(f"Total frames written: {frames_num}")
 
 
 if __name__ == "__main__":
