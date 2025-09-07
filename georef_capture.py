@@ -2,6 +2,10 @@ import cv2
 import threading
 import dataclasses
 from pymavlink import mavutil
+import argparse
+import os
+import datetime
+import yaml
 
 
 print(cv2.getBuildInformation())
@@ -23,12 +27,37 @@ class DroneData:
 
 
 class Capturer:
-    def __init__(self):
-        self.last_drone_data = DroneData()
+    def __init__(self, preview=True, video_filename=None):
+        self.last_drone_data = None
+        self.preview = preview
+        self.video_filename = video_filename
+        self.telems = []
+        self.cap = None
+        self.writer = None
+        self.mav_listener = None
+        self.running = False
+
+        self.output_dir = datetime.datetime.now().strftime("data/%Y-%m-%d_%H-%M-%S")
+        os.makedirs(self.output_dir, exist_ok=True)
+        if self.video_filename:
+            base = os.path.basename(self.video_filename)
+            self.video_filename = os.path.join(self.output_dir, base)
+
+    def run(self):
+        self.running = True
         self.mav_listener = threading.Thread(target=self.mavlink_listener)
         self.mav_listener.start()
-        self.video_capturer = threading.Thread(target=self.video_capture)
-        self.video_capturer.start()
+        self.video_capture()
+        self.finish()
+
+    def finish(self):
+        self.running = False
+        self.mav_listener.join()
+        print(f"Captured {len(self.telems)} telemetry points.")
+        yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
+        with open(yaml_path, "w") as f:
+            yaml.dump([dataclasses.asdict(t) for t in self.telems], f)
+        print(f"Telemetry saved to {yaml_path}")
 
     def mavlink_listener(self):
         print("Mavlink listener started")
@@ -38,49 +67,97 @@ class Capturer:
         print("Waiting for heartbeat...")
         master.wait_heartbeat()
         print("Heartbeat received!")
-        while True:
+        while self.running:
             msg = master.recv_match(
                 type=["GLOBAL_POSITION_INT", "ATTITUDE"], blocking=True
             )
             if not msg:
                 continue
+            if self.last_drone_data is None:
+                self.last_drone_data = DroneData()
 
             if msg.get_type() == "GLOBAL_POSITION_INT":
                 self.last_drone_data.lat = msg.lat / 1e7
                 self.last_drone_data.lon = msg.lon / 1e7
                 self.last_drone_data.alt = msg.alt / 1000.0  # in meters
-                print(
-                    f"Position: lat={self.last_drone_data.lat:.7f}, lon={self.last_drone_data.lon:.7f}, alt={self.last_drone_data.alt:.2f}m"
-                )
+
             elif msg.get_type() == "ATTITUDE":
                 self.last_drone_data.roll = msg.roll
                 self.last_drone_data.pitch = msg.pitch
                 self.last_drone_data.yaw = msg.yaw
+
+    def prepare_gst_writer(self):
+        if self.video_filename:
+            ret, frame = self.cap.read()
+            if not ret:
+                print("Error: Could not read frame for video writer initialization")
+                self.cap.release()
+                return
+            height, width = frame.shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"H264")
+            self.writer = cv2.VideoWriter(
+                self.video_filename, fourcc, 10.0, (width, height)
+            )
+            if self.writer is None or not self.writer.isOpened():
                 print(
-                    f"Attitude: roll={self.last_drone_data.roll:.3f}, pitch={self.last_drone_data.pitch:.3f}, yaw={self.last_drone_data.yaw:.3f}"
+                    f"Error: Could not open video file {self.video_filename} for writing (H264). Try .mkv"
                 )
+                self.writer = None
+            else:
+                print(f"Saving video to {self.video_filename} using H264 codec")
 
     def video_capture(self):
-        cap = cv2.VideoCapture(
-            "v4l2src device=/dev/video0 ! videoconvert ! appsink", cv2.CAP_GSTREAMER
+        self.cap = cv2.VideoCapture(
+            "v4l2src device=/dev/video0 ! video/x-raw,width=1280,height=720 ! videoconvert ! appsink",
+            cv2.CAP_GSTREAMER,
         )
-
-        if not cap.isOpened():
+        self.prepare_gst_writer()
+        frames_num = 0
+        if not self.cap.isOpened():
             print("Error: Unable to open camera")
             exit()
         while True:
-            ret, frame = cap.read()
+            ret, frame = self.cap.read()
             if ret:
-                cv2.imshow("test_capture", frame)
+                if self.preview:
+                    cv2.imshow("Frame", frame)
+                if self.writer:
+                    if self.last_drone_data:
+                        self.telems.append(self.last_drone_data)
+                        self.writer.write(frame)
+                        frames_num += 1
+                    else:
+                        print("Warning: No telem, skipping frame.")
             else:
                 print("Error: Could not read frame")
                 break
 
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            if self.preview and cv2.waitKey(1) == ord("q"):
                 break
 
-        cap.release()
+        self.cap.release()
+        if self.writer:
+            self.writer.release()
+
+        print(f"Total frames written: {frames_num}")
 
 
 if __name__ == "__main__":
-    capturer = Capturer()
+    parser = argparse.ArgumentParser(description="Georeferenced video capture")
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Show video preview window (default: off)",
+    )
+    parser.add_argument(
+        "--save",
+        metavar="FILENAME",
+        type=str,
+        help="Save video to the specified file (e.g., output.avi)",
+    )
+    args = parser.parse_args()
+    capturer = Capturer(
+        preview=args.preview,
+        video_filename=args.save,
+    )
+    capturer.run()
