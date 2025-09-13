@@ -27,10 +27,11 @@ class DroneData:
 
 
 class Capturer:
-    def __init__(self, preview=True, video_filename=None):
+    def __init__(self, args):
         self.last_drone_data = None
-        self.preview = preview
-        self.video_filename = video_filename
+        self.preview = args.preview
+        self.video_filename = args.save
+        self.no_tele = args.no_tele
         self.telems = []
         self.cap = None
         self.writer = None
@@ -45,19 +46,20 @@ class Capturer:
 
     def run(self):
         self.running = True
-        self.mav_listener = threading.Thread(target=self.mavlink_listener)
-        self.mav_listener.start()
+        if not self.no_tele:
+            self.mav_listener = threading.Thread(target=self.mavlink_listener)
+            self.mav_listener.start()
         self.video_capture()
         self.finish()
 
     def finish(self):
         self.running = False
-        self.mav_listener.join()
-        print(f"Captured {len(self.telems)} telemetry points.")
-        yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
-        with open(yaml_path, "w") as f:
-            yaml.dump([dataclasses.asdict(t) for t in self.telems], f)
-        print(f"Telemetry saved to {yaml_path}")
+        if not self.no_tele:
+            print(f"Captured {len(self.telems)} telemetry points.")
+            yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
+            with open(yaml_path, "w") as f:
+                yaml.dump([dataclasses.asdict(t) for t in self.telems], f)
+            print(f"Telemetry saved to {yaml_path}")
 
     def mavlink_listener(self):
         print("Mavlink listener started")
@@ -93,10 +95,14 @@ class Capturer:
                 print("Error: Could not read frame for video writer initialization")
                 self.cap.release()
                 return
+
             height, width = frame.shape[:2]
-            fourcc = cv2.VideoWriter_fourcc(*"H264")
+            gst_out = (
+                f"appsrc ! video/x-raw,format=BGR ! queue "
+                f"! videoconvert ! video/x-raw,format=NV12 ! x264enc bitrate=5000 tune=zerolatency ! h264parse ! mp4mux ! filesink location={self.video_filename}"
+            )
             self.writer = cv2.VideoWriter(
-                self.video_filename, fourcc, 10.0, (width, height)
+                gst_out, cv2.CAP_GSTREAMER, 0, 10.0, (width, height)
             )
             if self.writer is None or not self.writer.isOpened():
                 print(
@@ -123,7 +129,7 @@ class Capturer:
                     if self.preview:
                         cv2.imshow("Frame", frame)
                     if self.writer:
-                        if self.last_drone_data:
+                        if self.last_drone_data or self.no_tele:
                             self.telems.append(self.last_drone_data)
                             self.writer.write(frame)
                             frames_num += 1
@@ -155,11 +161,13 @@ if __name__ == "__main__":
         "--save",
         metavar="FILENAME",
         type=str,
-        help="Save video to the specified file (e.g., output.avi)",
+        help="Save video to the specified file (e.g., output.mp4)",
+    )
+    parser.add_argument(
+        "--no-tele",
+        action="store_true",
+        help="Disable telemetry data saving (default: off)",
     )
     args = parser.parse_args()
-    capturer = Capturer(
-        preview=args.preview,
-        video_filename=args.save,
-    )
+    capturer = Capturer(args)
     capturer.run()
