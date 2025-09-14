@@ -8,6 +8,8 @@ import datetime
 import yaml
 import copy
 
+STREAM_PIPELINE = " out. ! queue ! rtph264pay config-interval=1 pt=96 ! udpsink host={address} port={port} sync=false async=false"
+
 
 @dataclasses.dataclass()
 class DroneData:
@@ -26,8 +28,8 @@ class Capturer:
         print("Loaded config:")
         print(yaml.dump(self.config, sort_keys=False))
         self.preview = args.preview
-        self.video_filename = args.save
         self.no_tele = args.no_tele
+        self.stream_ip = args.stream_ip
         self.last_drone_data = None
         self.telems = []
         self.cap = None
@@ -37,9 +39,8 @@ class Capturer:
 
         self.output_dir = datetime.datetime.now().strftime("data/%Y-%m-%d_%H-%M-%S")
         os.makedirs(self.output_dir, exist_ok=True)
-        if self.video_filename:
-            base = os.path.basename(self.video_filename)
-            self.video_filename = os.path.join(self.output_dir, base)
+        base = os.path.basename("out.mp4")
+        self.video_filename = os.path.join(self.output_dir, base)
 
     def run(self):
         self.running = True
@@ -87,26 +88,33 @@ class Capturer:
                 self.last_drone_data.yaw = msg.yaw
 
     def prepare_gst_writer(self):
-        if self.video_filename:
-            ret, frame = self.cap.read()
-            if not ret:
-                print("Error: Could not read frame for video writer initialization")
-                self.cap.release()
-                return
+        ret, frame = self.cap.read()
+        if not ret:
+            print("Error: Could not read frame for video writer initialization")
+            self.cap.release()
+            return
 
-            height, width = frame.shape[:2]
-            gst_writer_pipeline = self.config.get("gst_writer_pipeline")
-            gst_out = gst_writer_pipeline.format(output_file=self.video_filename)
-            self.writer = cv2.VideoWriter(
-                gst_out, cv2.CAP_GSTREAMER, 0, self.config.get("fps"), (width, height)
+        height, width = frame.shape[:2]
+        gst_writer_pipeline = self.config.get("gst_writer_pipeline")
+        gst_writer_pipeline = gst_writer_pipeline.format(
+            output_file=self.video_filename
+        )
+        if self.stream_ip:
+            address, port = self.stream_ip.split(":")
+            gst_writer_pipeline += STREAM_PIPELINE.format(address=address, port=port)
+        print(f"GStreamer writer pipeline: {gst_writer_pipeline}")
+        self.writer = cv2.VideoWriter(
+            gst_writer_pipeline,
+            cv2.CAP_GSTREAMER,
+            0,
+            self.config.get("fps"),
+            (width, height),
+        )
+        if self.writer is None or not self.writer.isOpened():
+            print(
+                f"Error: Could not open video file {self.video_filename} for writing (H264). Try .mkv"
             )
-            if self.writer is None or not self.writer.isOpened():
-                print(
-                    f"Error: Could not open video file {self.video_filename} for writing (H264). Try .mkv"
-                )
-                self.writer = None
-            else:
-                print(f"Saving video to {self.video_filename} using H264 codec")
+            self.writer = None
 
     def video_capture(self):
         self.cap = cv2.VideoCapture(
@@ -154,15 +162,14 @@ if __name__ == "__main__":
         help="Show video preview window (default: off)",
     )
     parser.add_argument(
-        "--save",
-        metavar="FILENAME",
-        type=str,
-        help="Save video to the specified file (e.g., output.mp4)",
-    )
-    parser.add_argument(
         "--no-tele",
         action="store_true",
         help="Disable telemetry data saving (default: off)",
+    )
+    parser.add_argument(
+        "--stream-ip",
+        metavar="STREAM_IP",
+        help="UDP address for video streaming",
     )
     parser.add_argument(
         "--config",
