@@ -6,6 +6,7 @@ import argparse
 import os
 import datetime
 import yaml
+import copy
 
 
 @dataclasses.dataclass()
@@ -125,7 +126,7 @@ class Capturer:
                         cv2.imshow("Frame", frame)
                     if self.writer:
                         if self.last_drone_data or self.no_tele:
-                            self.telems.append(self.last_drone_data)
+                            self.telems.append(copy.deepcopy(self.last_drone_data))
                             self.writer.write(frame)
                             frames_num += 1
                         else:
