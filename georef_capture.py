@@ -8,9 +8,6 @@ import datetime
 import yaml
 
 
-print(cv2.getBuildInformation())
-
-
 @dataclasses.dataclass()
 class DroneData:
     lat: float = None
@@ -21,17 +18,16 @@ class DroneData:
     yaw: float = None
 
 
-# Connect to the PX4 autopilot (adjust the connection string as needed)
-# For serial: connection_string = '/dev/ttyUSB0', baud=57600
-# For UDP: connection_string = 'udp:127.0.0.1:14550'
-
-
 class Capturer:
     def __init__(self, args):
-        self.last_drone_data = None
+        with open(args.config, "r") as f:
+            self.config = yaml.safe_load(f)
+        print("Loaded config:")
+        print(yaml.dump(self.config, sort_keys=False))
         self.preview = args.preview
         self.video_filename = args.save
         self.no_tele = args.no_tele
+        self.last_drone_data = None
         self.telems = []
         self.cap = None
         self.writer = None
@@ -63,8 +59,9 @@ class Capturer:
 
     def mavlink_listener(self):
         print("Mavlink listener started")
-        connection_string = "udp:127.0.0.1:14551"
-        master = mavutil.mavlink_connection(connection_string)
+        master = mavutil.mavlink_connection(
+            self.config.get("connection_string"), baud=self.config.get("baud_rate")
+        )
 
         print("Waiting for heartbeat...")
         master.wait_heartbeat()
@@ -97,12 +94,10 @@ class Capturer:
                 return
 
             height, width = frame.shape[:2]
-            gst_out = (
-                f"appsrc ! video/x-raw,format=BGR ! queue "
-                f"! videoconvert ! video/x-raw,format=NV12 ! x264enc bitrate=5000 tune=zerolatency ! h264parse ! mp4mux ! filesink location={self.video_filename}"
-            )
+            gst_writer_pipeline = self.config.get("gst_writer_pipeline")
+            gst_out = gst_writer_pipeline.format(output_file=self.video_filename)
             self.writer = cv2.VideoWriter(
-                gst_out, cv2.CAP_GSTREAMER, 0, 10.0, (width, height)
+                gst_out, cv2.CAP_GSTREAMER, 0, self.config.get("fps"), (width, height)
             )
             if self.writer is None or not self.writer.isOpened():
                 print(
@@ -114,7 +109,7 @@ class Capturer:
 
     def video_capture(self):
         self.cap = cv2.VideoCapture(
-            "v4l2src device=/dev/video0 ! video/x-raw,width=1280,height=720 ! videoconvert ! appsink",
+            self.config.get("gst_capture_pipeline"),
             cv2.CAP_GSTREAMER,
         )
         self.prepare_gst_writer()
@@ -167,6 +162,13 @@ if __name__ == "__main__":
         "--no-tele",
         action="store_true",
         help="Disable telemetry data saving (default: off)",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="CONFIG_FILE",
+        type=str,
+        required=True,
+        help="YAML config file path to use (required)",
     )
     args = parser.parse_args()
     capturer = Capturer(args)
