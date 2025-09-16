@@ -1,24 +1,17 @@
 import cv2
 import threading
-import dataclasses
 from pymavlink import mavutil
 import argparse
 import os
 import datetime
 import yaml
 import copy
+import dataclasses
+from frame_selector import FrameSelector
+from models import DroneData
+
 
 STREAM_PIPELINE = " out. ! queue ! rtph264pay config-interval=1 pt=96 ! udpsink host={address} port={port} sync=false async=false"
-
-
-@dataclasses.dataclass()
-class DroneData:
-    lat: float = None
-    lon: float = None
-    alt: float = None
-    roll: float = None
-    pitch: float = None
-    yaw: float = None
 
 
 class Capturer:
@@ -41,6 +34,7 @@ class Capturer:
         os.makedirs(self.output_dir, exist_ok=True)
         base = os.path.basename("out.mp4")
         self.video_filename = os.path.join(self.output_dir, base)
+        self.frame_selector = FrameSelector(nth=10)
 
     def run(self):
         self.running = True
@@ -52,6 +46,9 @@ class Capturer:
 
     def finish(self):
         self.running = False
+        frames_dir = os.path.join(self.output_dir, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+        self.frame_selector.save_frames(frames_dir)
         if not self.no_tele:
             print(f"Captured {len(self.telems)} telemetry points.")
             yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
@@ -136,6 +133,7 @@ class Capturer:
                         if self.last_drone_data or self.no_tele:
                             self.telems.append(copy.deepcopy(self.last_drone_data))
                             self.writer.write(frame)
+                            self.frame_selector.take_frame(frame, self.last_drone_data)
                             frames_num += 1
                         else:
                             print("Warning: No telem, skipping frame.")
