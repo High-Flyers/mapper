@@ -34,21 +34,25 @@ class Capturer:
         os.makedirs(self.output_dir, exist_ok=True)
         base = os.path.basename("out.mp4")
         self.video_filename = os.path.join(self.output_dir, base)
-        self.frame_selector = FrameSelector(nth=10)
+        frames_dir = os.path.join(self.output_dir, "frames")
+        os.makedirs(frames_dir, exist_ok=True)
+        self.frame_selector = FrameSelector(frames_dir, nth=10)
 
     def run(self):
         self.running = True
         if not self.no_tele:
             self.mav_listener = threading.Thread(target=self.mavlink_listener)
             self.mav_listener.start()
+        else:
+            print(
+                "Telemetry disabled, not starting MAVLink listener, georef frames will not be saved."
+            )
         self.video_capture()
         self.finish()
 
     def finish(self):
         self.running = False
-        frames_dir = os.path.join(self.output_dir, "frames")
-        os.makedirs(frames_dir, exist_ok=True)
-        self.frame_selector.save_frames(frames_dir)
+        self.frame_selector.finish_saving()
         if not self.no_tele:
             print(f"Captured {len(self.telems)} telemetry points.")
             yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
