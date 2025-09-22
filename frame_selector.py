@@ -2,6 +2,7 @@ import threading
 import queue
 import numpy as np
 import os
+import logging
 from models import DroneData
 from exif_utils import save_frame_with_gps
 
@@ -40,7 +41,9 @@ class FrameSelector:
                 frame.copy(), drone_data, name=f"frame_{self.frame_count}"
             )
             self.to_save_queue.put(geo_frame)
-
+            logging.debug(
+                f"Queued frame {geo_frame.name} for saving with geodata: lat={drone_data.lat}, lon={drone_data.lon}, alt={drone_data.alt}"
+            )
         self.frame_count += 1
 
     def __saving_worker(self):

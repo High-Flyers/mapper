@@ -9,6 +9,7 @@ import copy
 import dataclasses
 from frame_selector import FrameSelector
 from models import DroneData
+import logging
 
 
 STREAM_PIPELINE = " out. ! queue ! rtph264pay config-interval=1 pt=96 ! udpsink host={address} port={port} sync=false async=false"
@@ -18,8 +19,8 @@ class Capturer:
     def __init__(self, args):
         with open(args.config, "r") as f:
             self.config = yaml.safe_load(f)
-        print("Loaded config:")
-        print(yaml.dump(self.config, sort_keys=False))
+        logging.info("Loaded config:")
+        logging.info("\n" + yaml.dump(self.config, sort_keys=False))
         self.preview = args.preview
         self.no_tele = args.no_tele
         self.stream_ip = args.stream_ip
@@ -44,7 +45,7 @@ class Capturer:
             self.mav_listener = threading.Thread(target=self.mavlink_listener)
             self.mav_listener.start()
         else:
-            print(
+            logging.info(
                 "Telemetry disabled, not starting MAVLink listener, georef frames will not be saved."
             )
         self.video_capture()
@@ -54,21 +55,21 @@ class Capturer:
         self.running = False
         self.frame_selector.finish_saving()
         if not self.no_tele:
-            print(f"Captured {len(self.telems)} telemetry points.")
+            logging.info(f"Captured {len(self.telems)} telemetry points.")
             yaml_path = os.path.join(self.output_dir, "telemetry.yaml")
             with open(yaml_path, "w") as f:
                 yaml.dump([dataclasses.asdict(t) for t in self.telems], f)
-            print(f"Telemetry saved to {yaml_path}")
+            logging.info(f"Telemetry saved to {yaml_path}")
 
     def mavlink_listener(self):
-        print("Mavlink listener started")
+        logging.info("Mavlink listener started")
         master = mavutil.mavlink_connection(
             self.config.get("connection_string"), baud=self.config.get("baud_rate")
         )
 
-        print("Waiting for heartbeat...")
+        logging.info("Waiting for heartbeat...")
         master.wait_heartbeat()
-        print("Heartbeat received!")
+        logging.info("Heartbeat received!")
         while self.running:
             msg = master.recv_match(
                 type=["GLOBAL_POSITION_INT", "ATTITUDE"], blocking=True
@@ -91,7 +92,7 @@ class Capturer:
     def prepare_gst_writer(self):
         ret, frame = self.cap.read()
         if not ret:
-            print("Error: Could not read frame for video writer initialization")
+            logging.error("Error: Could not read frame for video writer initialization")
             self.cap.release()
             return
 
@@ -103,7 +104,7 @@ class Capturer:
         if self.stream_ip:
             address, port = self.stream_ip.split(":")
             gst_writer_pipeline += STREAM_PIPELINE.format(address=address, port=port)
-        print(f"GStreamer writer pipeline: {gst_writer_pipeline}")
+        logging.info(f"GStreamer writer pipeline: {gst_writer_pipeline}")
         self.writer = cv2.VideoWriter(
             gst_writer_pipeline,
             cv2.CAP_GSTREAMER,
@@ -112,7 +113,7 @@ class Capturer:
             (width, height),
         )
         if self.writer is None or not self.writer.isOpened():
-            print(
+            logging.error(
                 f"Error: Could not open video file {self.video_filename} for writing (H264). Try .mkv"
             )
             self.writer = None
@@ -125,7 +126,7 @@ class Capturer:
         self.prepare_gst_writer()
         frames_num = 0
         if not self.cap.isOpened():
-            print("Error: Unable to open camera")
+            logging.error("Error: Unable to open camera")
             exit()
         try:
             while True:
@@ -140,25 +141,26 @@ class Capturer:
                             self.frame_selector.take_frame(frame, self.last_drone_data)
                             frames_num += 1
                         else:
-                            print("Warning: No telem, skipping frame.")
+                            logging.warning("Warning: No telem, skipping frame.")
                 else:
-                    print("Error: Could not read frame")
+                    logging.error("Error: Could not read frame")
                     break
 
                 if self.preview and cv2.waitKey(1) == ord("q"):
                     break
         except KeyboardInterrupt:
-            print("\nKeyboardInterrupt received in video loop. Exiting...")
+            logging.info("\nKeyboardInterrupt received in video loop. Exiting...")
         finally:
             self.cap.release()
             if self.writer:
                 self.writer.release()
-            print(f"Total frames written: {frames_num}")
+            logging.info(f"Total frames written: {frames_num}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Georeferenced video capture")
     parser.add_argument(
+        "-p",
         "--preview",
         action="store_true",
         help="Show video preview window (default: off)",
@@ -174,12 +176,24 @@ if __name__ == "__main__":
         help="UDP address for video streaming",
     )
     parser.add_argument(
+        "-c",
         "--config",
         metavar="CONFIG_FILE",
         type=str,
         required=True,
         help="YAML config file path to use (required)",
     )
+    parser.add_argument(
+        "-l",
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level (default: INFO)",
+    )
     args = parser.parse_args()
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper()),
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
     capturer = Capturer(args)
     capturer.run()
