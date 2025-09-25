@@ -37,6 +37,7 @@ class ImgSender:
                 continue
             try:
                 self.send_frame(frame)
+                logging.debug("Sent frame " + frame.name)
             except (KeyboardInterrupt, SystemExit):
                 break
             except Exception as ex:

@@ -8,11 +8,11 @@ from geo_frame import GeorefFrame
 
 
 class FrameSelector:
-    def __init__(self, dir: str, nth: int = 10):
+    def __init__(self, dir: str, send_ip: str, nth: int = 10):
         self.nth_frame: int = nth
         self.frame_count: int = 0
         self.dir = dir
-        self.img_sender = ImgSender(address="tcp://0.0.0.0:5001")
+        self.img_sender = ImgSender(address=f"tcp://{send_ip}:5001")
         self.to_save_queue = queue.Queue()
         self.saving_thread = threading.Thread(target=self.__saving_worker)
         self.saving_thread.start()

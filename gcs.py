@@ -2,6 +2,8 @@ import cv2
 import imagezmq
 import json
 import os
+import logging
+import argparse
 from datetime import datetime
 from geo_frame import GeorefFrame
 
@@ -18,7 +20,7 @@ class GCS:
             meta_dict = json.loads(meta_str)
 
             frame = GeorefFrame.from_dict(image, meta_dict)
-            print(frame.drone_data)
+            logging.info(frame.drone_data)
 
             frame.save(dir_path=self.output_dir)
             cv2.imshow("frame", frame.image)
@@ -27,5 +29,18 @@ class GCS:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GCS mapper")
+    parser.add_argument(
+        "-l",
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level (default: INFO)",
+    )
+    args = parser.parse_args()
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper()),
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
     gcs = GCS()
     gcs.run()

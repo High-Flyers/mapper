@@ -37,7 +37,11 @@ class Capturer:
         self.video_filename = os.path.join(self.output_dir, base)
         frames_dir = os.path.join(self.output_dir, "frames")
         os.makedirs(frames_dir, exist_ok=True)
-        self.frame_selector = FrameSelector(frames_dir, nth=10)
+        self.frame_selector = FrameSelector(
+            frames_dir,
+            self.config.get("gcs_ip"),
+            self.config.get("select_nth_frame"),
+        )
 
     def run(self):
         self.running = True
@@ -85,9 +89,9 @@ class Capturer:
                 self.last_drone_data.alt = msg.alt / 1000.0  # in meters
 
             elif msg.get_type() == "ATTITUDE":
-                self.last_drone_data.roll = msg.roll
-                self.last_drone_data.pitch = msg.pitch
-                self.last_drone_data.yaw = msg.yaw
+                self.last_drone_data.roll = round(msg.roll, 5)
+                self.last_drone_data.pitch = round(msg.pitch, 5)
+                self.last_drone_data.yaw = round(msg.yaw, 5)
 
     def prepare_gst_writer(self):
         ret, frame = self.cap.read()
