@@ -10,6 +10,13 @@ class GeorefFrame:
         self.drone_data: DroneData = drone_data
         self.name: str = name
 
+    @classmethod
+    def from_dict(cls, image, meta_dict):
+        img_name = meta_dict.get("name")
+        del meta_dict["name"]
+        drone_data = DroneData(**meta_dict)
+        return cls(image=image, drone_data=drone_data, name=img_name)
+
     def save(self, dir_path=None) -> None:
         path = self.name
         if dir_path is not None:

@@ -13,11 +13,11 @@ class ImgSender:
     def __init__(
         self,
         jpeg_quality=95,
-        adress="tcp://0.0.0.0:5001",
+        address="tcp://0.0.0.0:5001",
         max_queue_size=100,
     ):
         self.jpeg_quality = jpeg_quality
-        self.sender = imagezmq.ImageSender(connect_to=adress)
+        self.sender = imagezmq.ImageSender(connect_to=address)
         self.running = True
         self.frame_queue = queue.Queue(maxsize=max_queue_size)
         self.sending_thread = Thread(target=self.sending_loop)
@@ -48,6 +48,7 @@ class ImgSender:
         import json
 
         meta_dict = dataclasses.asdict(frame.drone_data)
+        meta_dict["name"] = frame.name
 
         meta_str = json.dumps(meta_dict)
         self.sender.send_image(meta_str, frame.image)
