@@ -1,5 +1,6 @@
 import cv2
 import imagezmq
+import simplejpeg
 import json
 import os
 import logging
@@ -16,7 +17,8 @@ class GCS:
     def run(self):
         image_hub = imagezmq.ImageHub(open_port="tcp://*:5001")
         while True:
-            meta_str, image = image_hub.recv_image()
+            meta_str, jpg_buffer = image_hub.recv_jpg()
+            image = simplejpeg.decode_jpeg(jpg_buffer, colorspace="BGR")
             meta_dict = json.loads(meta_str)
 
             frame = GeorefFrame.from_dict(image, meta_dict)

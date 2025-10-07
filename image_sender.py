@@ -5,6 +5,7 @@ import imagezmq
 import zmq
 from threading import Thread
 import logging
+import simplejpeg
 import queue
 from geo_frame import GeorefFrame
 from models import DroneData
@@ -17,6 +18,7 @@ class ImgSender:
         address="tcp://0.0.0.0:5001",
         max_queue_size=100,
     ):
+        logging.info(f"Starting ImgSender to {address}")
         self.jpeg_quality = jpeg_quality
         self.sender = imagezmq.ImageSender(connect_to=address)
         self.running = True
@@ -53,7 +55,10 @@ class ImgSender:
         meta_dict["name"] = frame.name
 
         meta_str = json.dumps(meta_dict)
-        self.sender.send_image(meta_str, frame.image)
+        jpg_buffer = simplejpeg.encode_jpeg(
+            frame.image, quality=self.jpeg_quality, colorspace="BGR"
+        )
+        self.sender.send_jpg(meta_str, jpg_buffer)
 
     def stop(self):
         logging.info("Stopping ImgSender...")
