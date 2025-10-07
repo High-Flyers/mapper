@@ -2,6 +2,7 @@ import dataclasses
 import time
 import cv2
 import imagezmq
+import zmq
 from threading import Thread
 import logging
 import queue
@@ -38,7 +39,7 @@ class ImgSender:
             try:
                 self.send_frame(frame)
                 logging.debug("Sent frame " + frame.name)
-            except (KeyboardInterrupt, SystemExit):
+            except (KeyboardInterrupt, SystemExit, zmq.error.ContextTerminated):
                 break
             except Exception as ex:
                 logging.warning("Img sender, Traceback error:", exc_info=ex)
@@ -55,7 +56,10 @@ class ImgSender:
         self.sender.send_image(meta_str, frame.image)
 
     def stop(self):
+        logging.info("Stopping ImgSender...")
         self.running = False
+        self.sender.zmq_socket.close(linger=0)
+        self.sender.close()
         self.sending_thread.join()
 
 
