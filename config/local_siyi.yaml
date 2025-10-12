@@ -1,0 +1,6 @@
+connection_string: "udp:127.0.0.1:14551"
+gst_capture_pipeline: "v4l2src device=/dev/video0 ! video/x-raw,width=1280,height=720 ! videoconvert ! appsink"
+gst_writer_pipeline: "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=NV12 ! x264enc bitrate=2000 tune=zerolatency ! h264parse ! tee name=out  out. ! queue ! mp4mux ! filesink location={output_file}"
+fps: 10
+gcs_ip: "192.168.144.124"
+select_nth_frame: 10

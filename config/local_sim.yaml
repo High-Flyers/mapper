@@ -1,0 +1,6 @@
+connection_string: "udp:127.0.0.1:14551"
+gst_capture_pipeline: "udpsrc port=5601 ! application/x-rtp,encoding-name=H264,payload=96 ! rtph264depay ! avdec_h264 ! videoconvert ! appsink"
+gst_writer_pipeline: "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=NV12 ! x264enc bitrate=5000 tune=zerolatency ! h264parse ! tee name=out  out. ! queue ! mp4mux ! filesink location={output_file}"
+fps: 30
+gcs_ip: "0.0.0.0"
+select_nth_frame: 50

@@ -12,7 +12,7 @@ class FrameSelector:
         self.nth_frame: int = nth
         self.frame_count: int = 0
         self.dir = dir
-        self.img_sender = ImgSender(address=f"tcp://{send_ip}:5001")
+        self.img_sender = ImgSender(address=f"tcp://{send_ip}:5001", jpeg_quality=80)
         self.to_save_queue = queue.Queue()
         self.saving_thread = threading.Thread(target=self.__saving_worker)
         self.saving_thread.start()

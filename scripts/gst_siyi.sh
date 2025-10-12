@@ -1,0 +1,1 @@
+gst-launch-1.0 rtspsrc location=rtsp://192.168.144.25:8554/main.264 latency=200 ! rtph265depay ! h265parse ! avdec_h265 ! videoconvert ! autovideosink sync=false
