@@ -41,6 +41,7 @@ class Capturer:
             frames_dir,
             self.config.get("gcs_ip"),
             self.config.get("select_nth_frame"),
+            self.config.get("select_on_request", False)
         )
 
     def run(self):
@@ -76,7 +77,7 @@ class Capturer:
         logging.info("Heartbeat received!")
         while self.running:
             msg = master.recv_match(
-                type=["GLOBAL_POSITION_INT", "ATTITUDE"], blocking=True
+                type=["GLOBAL_POSITION_INT", "ATTITUDE", "CAMERA_IMAGE_CAPTURED", "CAMERA_TRIGGER"], blocking=True
             )
             if not msg:
                 continue
@@ -92,6 +93,9 @@ class Capturer:
                 self.last_drone_data.roll = round(msg.roll, 5)
                 self.last_drone_data.pitch = round(msg.pitch, 5)
                 self.last_drone_data.yaw = round(msg.yaw, 5)
+            elif msg.get_type() == "CAMERA_IMAGE_CAPTURED" or msg.get_type() == "CAMERA_TRIGGER":
+                logging.info(f"Camera msg received {msg.get_type()}.")
+                self.frame_selector.request_saving()
 
     def prepare_gst_writer(self):
         ret, frame = self.cap.read()
