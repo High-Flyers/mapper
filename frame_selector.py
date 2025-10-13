@@ -44,7 +44,9 @@ class FrameSelector:
             self.to_save_queue.task_done()
             
     def request_saving(self):
-        self.save_next_frame = True
+        if self.on_request:
+            logging.info("Request to save next frame received.")
+            self.save_next_frame = True
 
     def finish_saving(self):
         self.to_save_queue.put(None)

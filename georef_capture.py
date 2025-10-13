@@ -94,7 +94,7 @@ class Capturer:
                 self.last_drone_data.pitch = round(msg.pitch, 5)
                 self.last_drone_data.yaw = round(msg.yaw, 5)
             elif msg.get_type() == "CAMERA_IMAGE_CAPTURED" or msg.get_type() == "CAMERA_TRIGGER":
-                logging.info(f"Camera msg received {msg.get_type()}.")
+                logging.debug(f"Camera msg received {msg.get_type()}.")
                 self.frame_selector.request_saving()
 
     def prepare_gst_writer(self):
