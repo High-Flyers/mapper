@@ -27,4 +27,6 @@ class GeorefFrame:
             lat=self.drone_data.lat,
             lng=self.drone_data.lon,
             alt=self.drone_data.alt,
+            rel_alt=self.drone_data.rel_alt,
+            yaw=self.drone_data.yaw,
         )

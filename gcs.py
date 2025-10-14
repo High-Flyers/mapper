@@ -22,7 +22,7 @@ class GCS:
             meta_dict = json.loads(meta_str)
 
             frame = GeorefFrame.from_dict(image, meta_dict)
-            logging.info(frame.drone_data)
+            logging.info(f"{frame.name}: {frame.drone_data}")
 
             frame.save(dir_path=self.output_dir)
             cv2.imshow("frame", frame.image)

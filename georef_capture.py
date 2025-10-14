@@ -88,6 +88,7 @@ class Capturer:
                 self.last_drone_data.lat = msg.lat / 1e7
                 self.last_drone_data.lon = msg.lon / 1e7
                 self.last_drone_data.alt = msg.alt / 1000.0  # in meters
+                self.last_drone_data.rel_alt = msg.relative_alt / 1000.0
 
             elif msg.get_type() == "ATTITUDE":
                 self.last_drone_data.roll = round(msg.roll, 5)
