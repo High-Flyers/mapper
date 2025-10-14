@@ -144,7 +144,7 @@ class Capturer:
                     if self.preview:
                         cv2.imshow("Frame", frame)
                     if self.writer:
-                        if self.last_drone_data or self.no_tele:
+                        if (self.last_drone_data and self.last_drone_data.is_initialized()) or self.no_tele:
                             self.telems.append(copy.deepcopy(self.last_drone_data))
                             self.writer.write(frame)
                             self.frame_selector.take_frame(frame, self.last_drone_data)

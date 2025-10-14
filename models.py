@@ -10,3 +10,14 @@ class DroneData:
     roll: float = None
     pitch: float = None
     yaw: float = None
+
+    def is_initialized(self) -> bool:
+        return None not in (
+            self.lat,
+            self.lon,
+            self.alt,
+            self.rel_alt,
+            self.roll,
+            self.pitch,
+            self.yaw,
+        )
