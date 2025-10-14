@@ -37,6 +37,7 @@ python georef_capture.py -p -c config/local_sim.yaml
 # for ground station
 python gcs.py
 ```
+When using simulation, the mavlink forwarding must be set in qgc to proper address!!!
 
 ## Data & Metadata
 
