@@ -5,13 +5,16 @@ import json
 import os
 import logging
 import argparse
+import yaml
 from datetime import datetime
 from geo_frame import GeorefFrame
 from map_visualization.realtime_mapper import RealTimeMapper
 
 
 class GCS:
-    def __init__(self):
+    def __init__(self, args):
+        with open(args.config, "r") as f:
+            self.config = yaml.safe_load(f)
         self.output_dir = datetime.now().strftime("data/gcs_%Y-%m-%d_%H-%M-%S")
         os.makedirs(self.output_dir, exist_ok=True)
         self.mapper = None
@@ -23,6 +26,7 @@ class GCS:
             while True:
                 meta_str, jpg_buffer = image_hub.recv_jpg()
                 image = simplejpeg.decode_jpeg(jpg_buffer, colorspace="BGR")
+                image_hub.send_reply(b"OK")
                 meta_dict = json.loads(meta_str)
 
                 frame = GeorefFrame.from_dict(image, meta_dict)
@@ -31,12 +35,15 @@ class GCS:
                 frame.save(dir_path=self.output_dir)
                 cv2.imshow("frame", frame.image)
                 cv2.waitKey(1)
-                image_hub.send_reply(b"OK")
 
                 if self.mapper is None:
                     h, w = frame.image.shape[:2]
                     self.mapper = RealTimeMapper(
-                        img_width=w, img_height=h, fov_x=1.74, alpha=0.5, preview=True
+                        img_width=w,
+                        img_height=h,
+                        fov_x=self.config.get("fov_x"),
+                        alpha=0.5,
+                        preview=True,
                     )
                 try:
                     self.mapper.add_frame(frame)
@@ -66,10 +73,18 @@ if __name__ == "__main__":
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level (default: INFO)",
     )
+    parser.add_argument(
+        "-c",
+        "--config",
+        metavar="CONFIG_FILE",
+        type=str,
+        required=True,
+        help="YAML config file path to use (required)",
+    )
     args = parser.parse_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper()),
         format="%(asctime)s %(levelname)s: %(message)s",
     )
-    gcs = GCS()
+    gcs = GCS(args)
     gcs.run()

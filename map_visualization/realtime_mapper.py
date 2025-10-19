@@ -196,7 +196,6 @@ class RealTimeMapper:
         # Original script rotated by -cam_direction (degrees). We'll mimic that with negative yaw_deg.
         yaw_deg = math.degrees(dd.yaw) if dd.yaw is not None else 0.0
         rotate_deg = -yaw_deg
-        print(f"Adding frame {geo_frame.name}: lat={dd.lat}, lon={dd.lon}, rel_alt={dd.rel_alt}, yaw={dd.yaw} rad ({yaw_deg} deg)")
 
         # Convert BGR (OpenCV) -> RGB before creating PIL Image to fix swapped colors
         bgr = geo_frame.image
