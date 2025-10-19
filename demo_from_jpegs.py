@@ -15,6 +15,7 @@ Notes:
 - If signed yaw_deg not available, derives signed yaw from GPSImgDirection (0..360) making (-180..180).
 - Field of view (fov_x) must be known for GSD estimation; adjust to your camera.
 """
+
 import time
 import os
 import math
@@ -30,6 +31,7 @@ from map_visualization.realtime_mapper import RealTimeMapper
 
 IMAGE_DESCRIPTION_TAG = 270  # ImageDescription
 GPS_INFO_TAG = 34853  # GPSInfo
+
 
 def parse_exif(path: str) -> DroneData | None:
     try:
@@ -49,16 +51,52 @@ def parse_exif(path: str) -> DroneData | None:
     lat_deg = None
     lon_deg = None
     cam_direction = None
+
+    def _ratio_to_float(r):
+        try:
+            if hasattr(r, "numerator") and hasattr(r, "denominator"):
+                return float(r.numerator) / float(r.denominator)
+            if isinstance(r, tuple) and len(r) == 2:
+                return float(r[0]) / float(r[1]) if r[1] else 0.0
+            return float(r)
+        except Exception:
+            return float(r)
+
+    def _dms_to_deg(dms):
+        return (
+            _ratio_to_float(dms[0])
+            + _ratio_to_float(dms[1]) / 60.0
+            + _ratio_to_float(dms[2]) / 3600.0
+        )
+
     if exif:
-            if 270 in exif:
-                rel_alt = float(exif[270].split("rel_alt=")[1].split(",")[0])
-            if 34853 in exif:
-                gps = exif[34853]
-                gps_N = gps[2]
-                gps_W = gps[4]
-                lat_deg = -float(gps_N[0] + gps_N[1]/60 + gps_N[2]/3600)
-                lon_deg = -float(gps_W[0] + gps_W[1]/60 + gps_W[2]/3600)
-                cam_direction = gps[17]
+        # Relative altitude stored in ImageDescription (custom format: ... rel_alt=XX, ...)
+        if IMAGE_DESCRIPTION_TAG in exif:
+            try:
+                rel_alt = float(
+                    exif[IMAGE_DESCRIPTION_TAG].split("rel_alt=")[1].split(",")[0]
+                )
+            except Exception:
+                rel_alt = None
+        if GPS_INFO_TAG in exif:
+            gps = exif[GPS_INFO_TAG]
+            try:
+                lat_ref = gps.get(1, "N")  # 'N' or 'S'
+                lon_ref = gps.get(3, "E")  # 'E' or 'W'
+                gps_lat = gps.get(2)
+                gps_lon = gps.get(4)
+                if gps_lat and gps_lon:
+                    lat_val = _dms_to_deg(gps_lat)
+                    lon_val = _dms_to_deg(gps_lon)
+                    if isinstance(lat_ref, bytes):
+                        lat_ref = lat_ref.decode(errors="ignore")
+                    if isinstance(lon_ref, bytes):
+                        lon_ref = lon_ref.decode(errors="ignore")
+                    lat_deg = -lat_val if lat_ref.upper() == "S" else lat_val
+                    lon_deg = -lon_val if lon_ref.upper() == "W" else lon_val
+                cam_direction = gps.get(17)  # GPSImgDirection if present (0..360)
+            except Exception as e:
+                logging.debug(f"GPS parse error for {path}: {e}")
 
     yaw_rad = math.radians(cam_direction) if cam_direction is not None else None
 
@@ -92,29 +130,56 @@ def build_georef_frames(paths: List[str]) -> List[GeorefFrame]:
 
 def main():
     parser = argparse.ArgumentParser(description="Orthomap demo from geotagged JPEGs")
-    parser.add_argument('-d', '--dir', required=True, help='Directory with geotagged JPEGs')
-    parser.add_argument('-o', '--output', default='map_visualization/orthomap_from_jpegs.png', help='Output PNG path')
-    parser.add_argument('--fov-x', type=float, default=1.74, help='Horizontal field of view (radians)')
-    parser.add_argument('--preview', action='store_true', help='Show live preview window')
-    parser.add_argument('--alpha', type=float, default=0.5, help='Blend factor for new frames (0..1)')
-    parser.add_argument('-l', '--log-level', default='INFO')
+    parser.add_argument(
+        "-d", "--dir", required=True, help="Directory with geotagged JPEGs"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="map_visualization/orthomap_from_jpegs.png",
+        help="Output PNG path",
+    )
+    parser.add_argument(
+        "--fov-x", type=float, default=1.74, help="Horizontal field of view (radians)"
+    )
+    parser.add_argument(
+        "--preview", action="store_true", help="Show live preview window"
+    )
+    parser.add_argument(
+        "--alpha", type=float, default=0.5, help="Blend factor for new frames (0..1)"
+    )
+    parser.add_argument("-l", "--log-level", default="INFO")
     args = parser.parse_args()
-    logging.basicConfig(level=getattr(logging, args.log_level.upper()), format='%(asctime)s %(levelname)s: %(message)s')
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper()),
+        format="%(asctime)s %(levelname)s: %(message)s",
+    )
 
     if not os.path.isdir(args.dir):
         raise SystemExit(f"Directory not found: {args.dir}")
 
-    all_files = [os.path.join(args.dir, f) for f in os.listdir(args.dir) if f.lower().endswith('.jpg')]
+    all_files = [
+        os.path.join(args.dir, f)
+        for f in os.listdir(args.dir)
+        if f.lower().endswith(".jpg")
+    ]
+    all_files.sort(key=lambda p: os.path.getmtime(p))
     if not all_files:
         raise SystemExit("No .jpg files found.")
 
-    georef_frames = build_georef_frames(sorted(all_files))
+    georef_frames = build_georef_frames(all_files)
     if not georef_frames:
         raise SystemExit("No georeferenced frames parsed.")
 
     # derive dimensions from first image
     h, w = georef_frames[0].image.shape[:2]
-    mapper = RealTimeMapper(img_width=w, img_height=h, fov_x=args.fov_x, alpha=args.alpha, preview=args.preview)
+    mapper = RealTimeMapper(
+        img_width=w,
+        img_height=h,
+        fov_x=args.fov_x,
+        alpha=args.alpha,
+        preview=args.preview,
+    )
 
     for gf in georef_frames:
         mapper.add_frame(gf)
@@ -128,5 +193,5 @@ def main():
         mapper.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

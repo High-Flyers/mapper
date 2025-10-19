@@ -175,9 +175,11 @@ class RealTimeMapper:
         geo_frame.drone_data must have lat, lon, alt, yaw (radians) and rel_alt.
         If yaw unavailable, no rotation is applied.
         Transparent background preserved for rotated images (only real pixels blended).
+        Frames taken at differing altitudes are scaled so ground sampling distance matches
+        the first (reference) frame, ensuring consistent map scale.
         """
         dd = geo_frame.drone_data
-        if any(v is None for v in [dd.lat, dd.lon, dd.rel_alt]):
+        if any(v is None for v in [dd.lat, dd.lon, dd.rel_alt, dd.yaw]):
             # insufficient geo data
             return
 
@@ -194,6 +196,7 @@ class RealTimeMapper:
         # Original script rotated by -cam_direction (degrees). We'll mimic that with negative yaw_deg.
         yaw_deg = math.degrees(dd.yaw) if dd.yaw is not None else 0.0
         rotate_deg = -yaw_deg
+        print(f"Adding frame {geo_frame.name}: lat={dd.lat}, lon={dd.lon}, rel_alt={dd.rel_alt}, yaw={dd.yaw} rad ({yaw_deg} deg)")
 
         # Convert BGR (OpenCV) -> RGB before creating PIL Image to fix swapped colors
         bgr = geo_frame.image
@@ -201,6 +204,22 @@ class RealTimeMapper:
         rgba = cv2.cvtColor(rgb, cv2.COLOR_RGB2RGBA)
         pil_rgba = Image.fromarray(rgba)
         rotated_img = pil_rgba.rotate(rotate_deg, expand=True, fillcolor=(0, 0, 0, 0))
+
+        # --- Altitude normalization: higher altitude => larger footprint on map ---
+        frame_gsd_x = self._compute_gsd_x(dd.rel_alt)
+        if frame_gsd_x <= 0:
+            return
+        # Scale so that pixel footprint in meters is respected relative to reference.
+        # If current frame GSD is larger (higher altitude) we ENLARGE the image so it covers more map area.
+        # If current frame GSD is smaller (lower altitude) we shrink it.
+        scale_factor = frame_gsd_x / ref_gsd_x  # >1 when higher than reference altitude
+        # Clamp extreme scaling to avoid huge memory usage.
+        scale_factor = max(0.05, min(40.0, scale_factor))
+        if abs(scale_factor - 1.0) > 1e-3:
+            new_w = max(1, int(rotated_img.width * scale_factor))
+            new_h = max(1, int(rotated_img.height * scale_factor))
+            rotated_img = rotated_img.resize((new_w, new_h), Image.Resampling.BILINEAR if scale_factor > 1 else Image.Resampling.LANCZOS)
+        # ------------------------------------------------------------------
         img_np = np.array(rotated_img)  # RGBA
         h, w = img_np.shape[:2]
 
@@ -209,7 +228,7 @@ class RealTimeMapper:
 
         # Place frame roughly at center + offset
         x_start = self.ortho_width // 2 + px_offset - w // 2
-        y_start = self.ortho_height // 2 + py_offset - h // 2
+        y_start = self.ortho_height // 2 - py_offset - h // 2
         x_end = x_start + w
         y_end = y_start + h
 
