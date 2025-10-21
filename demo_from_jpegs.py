@@ -24,6 +24,7 @@ import logging
 from typing import List
 import cv2
 from PIL import Image
+import re
 
 from geo_frame import GeorefFrame
 from models import DroneData
@@ -163,7 +164,16 @@ def main():
         for f in os.listdir(args.dir)
         if f.lower().endswith(".jpg")
     ]
-    all_files.sort(key=lambda p: os.path.getmtime(p))
+    _num_re = re.compile(r"(\d+)")
+
+    def _numeric_key(p: str):
+        base = os.path.basename(p)
+        m = _num_re.search(base)
+        if m:
+            return (0, int(m.group(1)))
+        return (1, base.lower())
+
+    all_files.sort(key=_numeric_key)
     if not all_files:
         raise SystemExit("No .jpg files found.")
 
@@ -179,6 +189,7 @@ def main():
         fov_x=args.fov_x,
         alpha=args.alpha,
         preview=args.preview,
+        ortho_width=7000
     )
 
     for gf in georef_frames:
