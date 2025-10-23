@@ -9,10 +9,10 @@ import copy
 import dataclasses
 from frame_selector import FrameSelector
 from models import DroneData
+from bitrate_utils import auto_configure_bitrates
 import logging
 
 
-STREAM_PIPELINE = " out. ! queue ! rtph264pay config-interval=1 pt=96 ! udpsink host={address} port={port} sync=false async=false"
 
 
 class Capturer:
@@ -113,9 +113,6 @@ class Capturer:
         gst_writer_pipeline = gst_writer_pipeline.format(
             output_file=self.video_filename
         )
-        if self.stream_ip:
-            address, port = self.stream_ip.split(":")
-            gst_writer_pipeline += STREAM_PIPELINE.format(address=address, port=port)
         logging.info(f"GStreamer writer pipeline: {gst_writer_pipeline}")
         self.writer = cv2.VideoWriter(
             gst_writer_pipeline,

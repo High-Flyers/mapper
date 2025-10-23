@@ -1,4 +1,5 @@
 # Mapper
+### New feature branch, consider as beta release
 
 Lightweight toolkit for collecting, georeferencing and transmitting frames captured from a camera mounted on a drone or vehicle. Designed for quick capture of frames with embedded GPS/altitude/attitude metadata and streaming them to a ground station or processing pipeline. Includes also ground station script for receiving frames and further postprocesing.
 
@@ -8,6 +9,7 @@ Lightweight toolkit for collecting, georeferencing and transmitting frames captu
 - Attach timestamp and metadata (position, roll/pitch/yaw) to frames, which are streamed over ImageZMQ to a remote receiver.
 - Simple frame selection (every Nth frame or on-request) and background saving.
 - Streaming and saving video feed
+- (Newer features branch): Automatic bitrate optimization: Automatically sets appropriate bitrates for streaming (3-4 Mbps max - SIYI Radio transfer limit) and saving (higher quality) based on camera resolution
 
 ## Components
 
@@ -16,6 +18,7 @@ Lightweight toolkit for collecting, georeferencing and transmitting frames captu
 - `frame_selector.py` — chooses frames to save/send and queues background saves.
 - `exif_utils.py` — writes EXIF GPS, altitude, relative altitude and yaw into JPEGs.
 - `image_sender.py` — streams JPEGs + metadata over ImageZMQ.
+- :pushpin: `bitrate_utils.py` — automatically calculates optimal bitrates for streaming and saving based on camera resolution.
 - `mavlink_check.py`, `gst_check.py`, `replay.py`, `gcs.py` — helpers for telemetry, capture, replay and ground-control interaction.
 - `config/` — example YAML configurations.
 - `data/` — example recorded sessions and archives.
@@ -24,7 +27,7 @@ Lightweight toolkit for collecting, georeferencing and transmitting frames captu
 
 1. Create a virtual environment for example with conda, then install dependencies:
    `pip install -r requirements.txt`
-   Be careful, scripts need openCV build with gstreamer you may need to build it by yourself and install in created enviroment! 
+   Be careful, scripts need OpenCV build with GStreamer you may need to build it by yourself and install in created enviroment! 
 
 2. Edit a config in `config/` to match camera and network settings.
 3. Run the capture script (see `georef_capture.py`) to start streaming and saving frames.
@@ -37,7 +40,7 @@ python georef_capture.py -p -c config/local_sim.yaml
 # for ground station
 python gcs.py
 ```
-When using simulation, the mavlink forwarding must be set in qgc to proper address!!!
+When using simulation, the MAVLink forwarding must be set in QGroundControl to proper address!!!
 
 ## Data & Metadata
 
@@ -51,5 +54,5 @@ Saved JPEGs include EXIF GPS tags (latitude, longitude, altitude), ImageDescript
 - [ ] check if script is getting video and telemetry- no warning or errors in logs
 - [ ] confirm camera settings like exposure/focus
 - [ ] when running on companion computer, do not use -p option
-- [ ] if you need video preview do not use to high bitrate, for now there is one bitrate for saving and streaming.
-- [ ] run with proper config!
+- [ ] ~~if you need video preview do not use to high bitrate, for now there is one bitrate for saving and streaming.~~ Fixed
+- [ ] run with proper config (`/config` folder)

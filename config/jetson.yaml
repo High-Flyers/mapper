@@ -1,8 +1,9 @@
-connection_string: "/dev/ttyTHS1"
+connection_string: "/dev/ttyTHS1" # Change to UDP whenever needed
 baud_rate: 57600
 gst_capture_pipeline: 'nvarguscamerasrc sensor-id=0 tnr-mode=1 exposuretimerange="0 15000000" ! video/x-raw(memory:NVMM), width=1920, height=1080, framerate=30/1 ! nvvidconv flip-method=2 ! video/x-raw, width=1280, height=720, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! appsink name=appsink'
-gst_writer_pipeline: "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=NV12 ! x264enc speed-preset=veryfast bitrate=1000 tune=zerolatency ! h264parse ! tee name=out  out. ! queue ! mp4mux ! filesink location={output_file}"
-fps: 30
-gcs_ip: "192.168.144.25" #verify
+gst_writer_pipeline: "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=NV12 ! x264enc speed-preset=veryfast tune=zerolatency ! h264parse ! tee name=out  out. ! queue ! mp4mux ! filesink location={output_file}"
+fps: 30 # May work with 60 fps, but not tested
+gcs_ip: "192.168.144.25" #IP Acquired only through connection from one laptop with local addressess set to 192.168.144.0/24 subnet.
 select_on_request: True
 # select_nth_frame: 30
+## Be sure to change the address to the correct one.
