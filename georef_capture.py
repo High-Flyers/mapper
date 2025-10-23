@@ -19,6 +19,9 @@ class Capturer:
     def __init__(self, args):
         with open(args.config, "r") as f:
             self.config = yaml.safe_load(f)
+        # automatic bitrate configuration
+        self.config = auto_configure_bitrates(self.config, args.stream_ip)
+        
         logging.info("Loaded config:")
         logging.info("\n" + yaml.dump(self.config, sort_keys=False))
         self.preview = args.preview
