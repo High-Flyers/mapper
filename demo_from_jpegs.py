@@ -21,7 +21,7 @@ import os
 import math
 import argparse
 import logging
-from typing import List
+from typing import List, Optional
 import cv2
 from PIL import Image
 import re
@@ -34,7 +34,7 @@ IMAGE_DESCRIPTION_TAG = 270  # ImageDescription
 GPS_INFO_TAG = 34853  # GPSInfo
 
 
-def parse_exif(path: str) -> DroneData | None:
+def parse_exif(path: str) -> Optional[DroneData]:
     try:
         img = Image.open(path)
         exif = img._getexif()
