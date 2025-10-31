@@ -19,6 +19,7 @@ from typing import Optional
 from PIL import Image, ImageTk
 import tkinter as tk
 from geo_frame import GeorefFrame
+from concurrent.futures import ThreadPoolExecutor
 import cv2
 
 
@@ -32,7 +33,7 @@ class RealTimeMapper:
         ortho_height: int = 5000,
         alpha: float = 0.5,
         preview: bool = False,
-        preview_scale: float = 0.4,
+        preview_scale: float = .5,
     ):
         """Initialize realtime mapper.
 
@@ -52,6 +53,8 @@ class RealTimeMapper:
         self.alpha = alpha
         self.preview = preview
         self.preview_scale = preview_scale
+
+        self.executor = ThreadPoolExecutor(max_workers=2)
 
         # RGBA canvas
         self.ortho_map = np.zeros((ortho_height, ortho_width, 4), dtype=np.uint8)
@@ -137,7 +140,9 @@ class RealTimeMapper:
         target_w = int(self.ortho_width * self.preview_scale * self.zoom)
         target_h = int(self.ortho_height * self.preview_scale * self.zoom)
         resample = Image.Resampling.NEAREST if fast else Image.Resampling.LANCZOS
-        preview_img = preview_img.resize((target_w, target_h), resample)
+        # preview_img = preview_img.resize((target_w, target_h), resample)
+        preview_np = cv2.resize(self.ortho_map, (target_w, target_h), interpolation=cv2.INTER_NEAREST)
+        preview_img = Image.fromarray(preview_np, 'RGBA')
         self._tk_img = ImageTk.PhotoImage(preview_img)
         if self._canvas_image_id is None:
             self._canvas_image_id = self._tk_canvas.create_image(0, 0, anchor='nw', image=self._tk_img)
@@ -267,9 +272,12 @@ class RealTimeMapper:
 
     def save(self, output_path: str) -> None:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        Image.fromarray(self.ortho_map, 'RGBA').save(output_path)
+        img = Image.fromarray(self.ortho_map, 'RGBA').copy()
+        self.executor.submit(img.save, output_path)
 
     def close(self):
+        if self.executor:
+            self.executor.shutdown(wait=True)
         if self._tk_root is not None:
             try:
                 self._tk_root.destroy()

@@ -31,7 +31,7 @@ def gps_to_pixel_offset(lat_ref, lon_ref, lat, lon, GSD_x):
     py_offset = int(delta_y_m / GSD_x)
     return px_offset, py_offset
 
-def generate_map(folder_path="map_visualization/samples", img_width=1280, img_height=720, fov_x=1.74, ortho_width = 5000, ortho_height = 5000,
+def generate_map(folder_path="map_visualization/samples_2", img_width=1280, img_height=720, fov_x=1.74, ortho_width = 5000, ortho_height = 5000,
                  preview_scale=.4, alpha=.5, show_preview=True):
     """Main function to generate orthophoto map"""
     fov_y = fov_x * (img_height / img_width)
@@ -105,13 +105,13 @@ def generate_map(folder_path="map_visualization/samples", img_width=1280, img_he
 
         if show_preview:
             preview_img = Image.fromarray(ortho_map, "RGBA").resize(
-                (int(ortho_width * preview_scale), int(ortho_height * preview_scale)), Image.ANTIALIAS)
+                (int(ortho_width * preview_scale), int(ortho_height * preview_scale)), Image.Resampling.LANCZOS)
             tk_img = ImageTk.PhotoImage(preview_img)
             canvas.create_image(0, 0, anchor="nw", image=tk_img)
             root.update()
 
     output_folder = "map_visualization"
-    output_path = os.path.join(output_folder, "orthomap_vis.png")
+    output_path = os.path.join(output_folder, "orthomap_vis_2.png")
     Image.fromarray(ortho_map, "RGBA").save(output_path)
     print(f"Zapisano jako: {output_path}")
 

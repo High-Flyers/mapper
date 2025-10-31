@@ -128,7 +128,6 @@ def build_georef_frames(paths: List[str]) -> List[GeorefFrame]:
         frames.append(GeorefFrame(image=img, drone_data=dd, name=name))
     return frames
 
-
 def main():
     parser = argparse.ArgumentParser(description="Orthomap demo from geotagged JPEGs")
     parser.add_argument(
@@ -189,12 +188,12 @@ def main():
         fov_x=args.fov_x,
         alpha=args.alpha,
         preview=args.preview,
-        ortho_width=7000
+        ortho_width=5000
     )
 
     for gf in georef_frames:
         mapper.add_frame(gf)
-        time.sleep(0.1)  # simulate processing delay
+        # time.sleep(0.1)  # simulate processing delay
 
     mapper.save(args.output)
     logging.info(f"Saved orthomap to {args.output}")
@@ -202,7 +201,6 @@ def main():
         mapper.wait_until_closed()
         logging.info("Closing preview window...")
         mapper.close()
-
 
 if __name__ == "__main__":
     main()
