@@ -1,0 +1,8 @@
+connection_string: "udp:0.0.0.0:14550"
+baud_rate: 57600
+gst_capture_pipeline: 'nvarguscamerasrc sensor-id=0 tnr-mode=1 tnr-strength=0 exposuretimerange="0 15000000" ! video/x-raw(memory:NVMM), width=4032, height=3040, framerate=21/1 ! nvvidconv flip-method=2 ! video/x-raw, width=2016, height=1520, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! appsink name=appsink'
+gst_writer_pipeline: "appsrc ! video/x-raw,format=BGR ! queue ! videoconvert ! video/x-raw,format=NV12 ! x264enc speed-preset=veryfast bitrate=6000 tune=zerolatency ! h264parse ! tee name=out  out. ! queue ! mp4mux ! filesink location={output_file}"
+fps: 21
+gcs_ip: "192.168.144.25" #verify
+select_on_request: True
+# select_nth_frame: 50
