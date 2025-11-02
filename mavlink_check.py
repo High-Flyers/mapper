@@ -3,7 +3,7 @@ from pymavlink import mavutil
 # Connect to the PX4 autopilot (adjust the connection string as needed)
 # For serial: connection_string = '/dev/ttyUSB0', baud=57600
 # For UDP: connection_string = 'udp:127.0.0.1:14550'
-connection_string = "/dev/ttyTHS1"
+connection_string = "udp:0.0.0.0:14550"
 master = mavutil.mavlink_connection(connection_string, baud=57600)
 
 print("Waiting for heartbeat...")

@@ -22,8 +22,12 @@ class FrameSelector:
         self.saving_thread = threading.Thread(target=self.__saving_worker)
         self.saving_thread.start()
         self.save_next_frame = False
+        self.last_frame = None
+        self.last_data = None
 
     def take_frame(self, frame: np.ndarray, drone_data: DroneData) -> None:
+        self.last_frame = frame
+        self.last_data = drone_data
         if drone_data is not None:
             if (
                 not self.on_request and self.frame_count % self.nth_frame == 0
@@ -50,7 +54,12 @@ class FrameSelector:
     def request_saving(self):
         if self.on_request:
             logging.info("Request to save next frame received.")
-            self.save_next_frame = True
+            if self.last_frame is not None and self.last_data is not None:
+                geo_frame = GeorefFrame(
+                    self.last_frame.copy(), self.last_data, name=f"frame_{self.frame_count}"
+                )
+                self.to_save_queue.put(geo_frame)
+                self.img_sender.add_frame_to_send(geo_frame)
 
     def finish_saving(self):
         self.to_save_queue.put(None)
