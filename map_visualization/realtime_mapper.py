@@ -184,7 +184,7 @@ class RealTimeMapper:
         the first (reference) frame, ensuring consistent map scale.
         """
         dd = geo_frame.drone_data
-        if any(v is None for v in [dd.lat, dd.lon, dd.rel_alt, dd.yaw]):
+        if any(v is None for v in [dd.lat, dd.lon, dd.rel_alt, dd.yaw]) or dd.rel_alt < 0:
             # insufficient geo data
             return
 

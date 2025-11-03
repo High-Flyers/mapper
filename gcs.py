@@ -42,8 +42,11 @@ class GCS:
                         img_width=w,
                         img_height=h,
                         fov_x=self.config.get("fov_x"),
-                        alpha=0.5,
+                        alpha=0.7,
                         preview=True,
+                        ortho_height=11000,
+                        ortho_width=5000,
+                        preview_scale=0.3
                     )
                 try:
                     self.mapper.add_frame(frame)
