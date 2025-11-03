@@ -44,9 +44,9 @@ class GCS:
                         fov_x=self.config.get("fov_x"),
                         alpha=0.7,
                         preview=True,
-                        ortho_height=11000,
-                        ortho_width=5000,
-                        preview_scale=0.3
+                        ortho_height=14000,
+                        ortho_width=7000,
+                        preview_scale=0.25
                     )
                 try:
                     self.mapper.add_frame(frame)

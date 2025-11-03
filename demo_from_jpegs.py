@@ -188,7 +188,9 @@ def main():
         fov_x=args.fov_x,
         alpha=args.alpha,
         preview=args.preview,
-        ortho_width=5000
+        ortho_width=5000,
+        ortho_height=10000,
+        preview_scale=0.3
     )
 
     for gf in georef_frames:
