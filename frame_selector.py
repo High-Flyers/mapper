@@ -2,6 +2,7 @@ import threading
 import queue
 import numpy as np
 import logging
+import copy
 from image_sender import ImgSender
 from models import DroneData
 from geo_frame import GeorefFrame
@@ -56,7 +57,7 @@ class FrameSelector:
             logging.info("Request to save next frame received.")
             if self.last_frame is not None and self.last_data is not None:
                 geo_frame = GeorefFrame(
-                    self.last_frame.copy(), self.last_data, name=f"frame_{self.frame_count}"
+                    self.last_frame.copy(), copy.deepcopy(self.last_data), name=f"frame_{self.frame_count}"
                 )
                 self.to_save_queue.put(geo_frame)
                 self.img_sender.add_frame_to_send(geo_frame)
